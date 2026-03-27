@@ -42,7 +42,7 @@ def display_banner():
             /_/ /_/\____/____/\__/   /____/_/ /_/_/ .___/\___/_/     
                                                  /_/                 
 
-                v0.1.1 - BugHost Scanner & Reconnaissance Tool 
+                v0.1.4 - BugHost Scanner & Reconnaissance Tool 
     Developed by @MalwareDot | Telegram: @MalwareDot | GitHub: @malwaredot
                     Telegram Group: @Hack_Institute_chat
             """
