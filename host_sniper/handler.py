@@ -7,7 +7,9 @@ from host_sniper.bugscanner import DirectScanner, ProxyScanner, SSLScanner, UdpS
 import subprocess
 import os
 import socket
+import ssl
 from pathlib import Path
+from datetime import datetime
 import dns.resolver
 import requests
 from rich.console import Console
@@ -430,6 +432,47 @@ def run_whois_lookup():
         console.print("[yellow]Make sure python-whois is installed: pip install python-whois[/yellow]")
 
 
+def _ssl_fallback_scan(target, port, output_file):
+    """Fallback SSL scan using Python ssl library when sslscan binary is unavailable"""
+    console.print(f"[yellow]Using Python SSL fallback for {target}:{port}[/yellow]")
+    lines = []
+    try:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        with socket.create_connection((target, port), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=target) as ssock:
+                cert = ssock.getpeercert()
+                cipher = ssock.cipher()
+                protocol = ssock.version()
+
+                lines.append(f"SSL/TLS fallback scan for {target}:{port}")
+                lines.append(f"Scan time: {datetime.utcnow().isoformat()}Z")
+                lines.append(f"Protocol: {protocol}")
+                if cipher:
+                    lines.append(f"Cipher: {cipher[0]} ({cipher[1]}, {cipher[2]})")
+
+                if cert:
+                    lines.append("\nCertificate details:")
+                    for key, value in cert.items():
+                        lines.append(f"{key}: {value}")
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
+
+        for line in lines:
+            console.print(line)
+
+        console.print(f"[green][✓] Fallback SSL results saved to {output_file}[/green]")
+
+        return True
+
+    except Exception as e:
+        console.print(f"[red]Fallback SSL scan failed: {e}[/red]")
+        return False
+
+
 def run_ssl_analysis():
     """Run SSL certificate analysis using sslscan"""
     target = input("Enter domain or IP address: ").strip()
@@ -545,7 +588,10 @@ def run_ssl_analysis():
         proc.kill()
         console.print('[red]sslscan timed out\n[/red]')
     except FileNotFoundError:
-        console.print('[red]sslscan not found. Please install via apt/yum/brew or from https://github.com/rbsec/sslscan[/red]')
+        console.print('[yellow]sslscan not found. Falling back to Python SSL probe...[/yellow]')
+        fallback_success = _ssl_fallback_scan(target, port, output_file)
+        if not fallback_success:
+            console.print('[red]Fallback SSL scan also failed. Please install sslscan or check network connectivity.[/red]')
     except Exception as e:
         console.print(f"[red]SSL analysis failed: {e}[/red]")
 

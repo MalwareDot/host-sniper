@@ -1,0 +1,4 @@
+SSL/TLS fallback scan for example.com:443
+Scan time: 2026-03-27T12:49:49.614944Z
+Protocol: TLSv1.3
+Cipher: TLS_AES_256_GCM_SHA384 (TLSv1.3, 256)
