@@ -28,18 +28,12 @@ dependencies = [
     "rich>=13.0.0",
     "urllib3>=1.26.0",
     "dnspython>=2.3.0",
-    "python-whois>=0.7.3",
+    "python-whois>=0.7.3"
 ]
 
 [project.urls]
 Home = "https://github.com/malwaredot/host-sniper"
 "Bug Tracker" = "https://github.com/malwaredot/host-sniper/issues"
 
-[distutils]
-index-servers =
-    pypi
-
-[pypi]
-repository: https://upload.pypi.org/legacy/
-username: __token__
-password: pypi-.....your-token....
+[project.scripts]
+host-sniper = "host_sniper.main:main"

@@ -461,27 +461,46 @@ def run_ssl_analysis():
     console.print(f"[bold blue]Running sslscan on {target}:{port}...[/bold blue]")
     console.print(f"[cyan]Output file: {output_file}[/cyan]\n")
 
+    process_output = []
+
     try:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
-            refresh_per_second=2
+            refresh_per_second=10
         ) as progress:
             task = progress.add_task("Scanning SSL/TLS configuration...", total=None)
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+
+            while True:
+                line = proc.stdout.readline()
+                if line:
+                    line = line.rstrip('\n')
+                    process_output.append(line)
+                    console.print(f"[grey58]{line}[/grey58]")
+                if proc.poll() is not None:
+                    break
+
+            proc.wait(timeout=120)
             progress.update(task, completed=True)
 
-        if result.returncode != 0:
-            console.print(f"[red]sslscan failed with exit code {result.returncode}[/red]")
-            if result.stderr:
-                console.print(f"[red]stderr: {result.stderr}[/red]")
-            return
+            if proc.returncode != 0:
+                console.print(f"[red]sslscan failed with exit code {proc.returncode}[/red]")
+                return
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(f"sslscan Results for {target}:{port}\n")
             f.write("=" * 50 + "\n")
-            f.write(result.stdout)
+            f.write("\n".join(process_output))
 
         console.print(f"[green][✓] sslscan completed and output saved to {output_file}[/green]")
 
@@ -489,7 +508,7 @@ def run_ssl_analysis():
         vulnerabilities = []
         cipher_info = []
 
-        for line in result.stdout.splitlines():
+        for line in process_output:
             l = line.strip()
             if l.lower().startswith('subject:'):
                 cert_info['Subject'] = l.split(':', 1)[1].strip()
@@ -523,6 +542,7 @@ def run_ssl_analysis():
             console.print('\n[bold green]No immediate SSL vulnerabilities detected in sslscan output[/bold green]')
 
     except subprocess.TimeoutExpired:
+        proc.kill()
         console.print('[red]sslscan timed out\n[/red]')
     except FileNotFoundError:
         console.print('[red]sslscan not found. Please install via apt/yum/brew or from https://github.com/rbsec/sslscan[/red]')
@@ -589,8 +609,7 @@ def run_help():
   Run the tool and select an option from the menu.
   
 [bold]Required Tools:[/bold]
-  • subfinder - for subdomain enumeration (go get -u github.com/projectdiscovery/subfinder/v2/cmd/subfinder)
-  • dnspython - for DNS lookups (pip install dnspython)
+  • subfinder - for subdomain enumeration (go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest)
 """
     console.print(help_text)
 

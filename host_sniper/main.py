@@ -35,15 +35,16 @@ console = Console()
 def display_banner():
     """Display application banner"""
     banner = r"""
-        __  __           __     _____       _                
-       / / / /___  _____/ /_   / ___/____  (_)___  ___  _____
-      / /_/ / __ \/ ___/ __/   \__ \/ __ \/ / __ \/ _ \/ ___/
-     / __  / /_/ (__  ) /_    ___/ / / / / / /_/ /  __/ /    
-    /_/ /_/\____/____/\__/   /____/_/ /_/_/ .___/\___/_/     
-                                         /_/                 
+                __  __           __     _____       _                
+               / / / /___  _____/ /_   / ___/____  (_)___  ___  _____
+              / /_/ / __ \/ ___/ __/   \__ \/ __ \/ / __ \/ _ \/ ___/
+             / __  / /_/ (__  ) /_    ___/ / / / / / /_/ /  __/ /    
+            /_/ /_/\____/____/\__/   /____/_/ /_/_/ .___/\___/_/     
+                                                 /_/                 
 
-    v0.1.1 - BugHost Scanner & Reconnaissance Tool
+                v0.1.1 - BugHost Scanner & Reconnaissance Tool 
     Developed by @MalwareDot | Telegram: @MalwareDot | GitHub: @malwaredot
+                    Telegram Group: @Hack_Institute_chat
             """
     panel = Panel(
         Align.center(banner),

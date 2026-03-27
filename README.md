@@ -1,24 +1,36 @@
 # Host Sniper
 
-A comprehensive security scanning and reconnaissance tool that combines the functionality of BugScanner and BugScanX into a unified platform.
+A comprehensive security scanning and reconnaissance tool that combines the functionality of tools into a unified platform.
+
+### 
+                            __  __           __     _____       _                
+                           / / / /___  _____/ /_   / ___/____  (_)___  ___  _____
+                          / /_/ / __ \/ ___/ __/   \__ \/ __ \/ / __ \/ _ \/ ___/
+                         / __  / /_/ (__  ) /_    ___/ / / / / / /_/ /  __/ /    
+                        /_/ /_/\____/____/\__/   /____/_/ /_/_/ .___/\___/_/     
+                                                             /_/                 
+
+
 
 ## Features
 
-### Scanning & Enumeration
-- **Port Scanner** - Fast multi-threaded port scanning with common and full range options
-- **Host Scanner** - CIDR range and batch host scanning
-- **Subdomain Finder** - Subdomain enumeration from multiple sources
-- **IP Lookup** - IP address and domain information gathering
-- **DNS Records** - DNS record enumeration
-- **Host Info** - Local system information
+### Tool Features
+- **Port Scanner** - TCP port enumeration with common-port and full-range options; supports rate limiting, concurrency, and retry logic
+- **Host Scanner** - CIDR range scanning and host availability checks using fast multithreaded workers
+- **Subdomain Finder** - Enumerates subdomains via built-in services, brute-force candidate generation, and wildcard detection
+- **IP Lookup** - Performs IP geolocation, ASN lookup, ping check, and reverse DNS results
+- **Reverse IP Lookup** - Finds all domains hosted on a target IP using external lookup services
+- **WHOIS Lookup** - Retrieves domain WHOIS data, expiry, registrar, and contact details
+- **SSL Analysis** - Runs `sslscan` integration to collect certificate chain, supported protocols/ciphers, and expiry status
+- **DNS Records** - Queries A, AAAA, MX, NS, TXT, and CNAME records with configurable DNS resolver
+- **Host Info** - Displays local system details, network interfaces, and environment information
 
 ### Advanced Capabilities
-- Multi-threaded scanning for performance
-- CIDR range support with batch processing
-- Direct HTTP scanning with multiple methods
-- Proxy-based scanning
-- SSL/TLS certificate validation
-- Configurable timeouts and retries
+- Configurable concurrency with thread pools and timeouts
+- Built-in rate limiter and retry mechanism to avoid service throttling
+- Proxy support for direct scan requests
+- Rich CLI experience with progress bars, status updates, and error handling
+- Portable architecture ready for packaging with setuptools and PyPI deployment
 
 ## Installation
 
@@ -117,3 +129,8 @@ Contributions welcome! Please submit pull requests or open issues for bugs/featu
 ## Disclaimer
 
 This tool is for authorized security testing only. Unauthorized access to computer systems is illegal.
+
+
+## Join us
+[MalwareDot](https://t.me/malwaredot) \
+[Telegram Group](https://t.me/Hack_institute_chat)
