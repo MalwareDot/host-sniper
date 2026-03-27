@@ -488,110 +488,42 @@ def run_ssl_analysis():
         console.print("[red]Invalid port number[/red]")
         return
 
-    output_file = f"{target}_sslscan.txt"
-
-    cmd = [
-        "sslscan",
-        "--no-failed",
-        "--no-rejected",
-        "--no-compression",
-        "--no-heartbleed",
-        "--no-renegotiation",
-        "--no-resumption",
-        f"{target}:{port}"
-    ]
+    output_file = f"{target}_{port}_sslscan.txt"
+    cmd = ["sslscan", f"{target}:{port}"]
 
     console.print(f"[bold blue]Running sslscan on {target}:{port}...[/bold blue]")
     console.print(f"[cyan]Output file: {output_file}[/cyan]\n")
 
-    process_output = []
-
     try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            refresh_per_second=10
-        ) as progress:
-            task = progress.add_task("Scanning SSL/TLS configuration...", total=None)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
 
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
+        if result.returncode != 0:
+            console.print(f"[red]sslscan failed with exit code {result.returncode}[/red]")
+            if result.stderr:
+                console.print(f"[red]{result.stderr.strip()}[/red]")
+            return
 
-            while True:
-                line = proc.stdout.readline()
-                if line:
-                    line = line.rstrip('\n')
-                    process_output.append(line)
-                    console.print(f"[grey58]{line}[/grey58]")
-                if proc.poll() is not None:
-                    break
+        output_text = result.stdout.strip()
 
-            proc.wait(timeout=120)
-            progress.update(task, completed=True)
+        if not output_text:
+            console.print('[yellow]sslscan returned no output. Check whether sslscan is installed and accessible.[/yellow]')
+            return
 
-            if proc.returncode != 0:
-                console.print(f"[red]sslscan failed with exit code {proc.returncode}[/red]")
-                return
+        # Show output directly
+        console.print('\n[bold cyan]sslscan output:[/bold cyan]')
+        for line in output_text.splitlines():
+            console.print(f"[grey58]{line}[/grey58]")
 
+        # Save output to file
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(f"sslscan Results for {target}:{port}\n")
-            f.write("=" * 50 + "\n")
-            f.write("\n".join(process_output))
+            f.write(output_text)
 
-        console.print(f"[green][✓] sslscan completed and output saved to {output_file}[/green]")
+        console.print(f"[green][✓] sslscan output saved to {output_file}[/green]")
 
-        cert_info = {}
-        vulnerabilities = []
-        cipher_info = []
-
-        for line in process_output:
-            l = line.strip()
-            if l.lower().startswith('subject:'):
-                cert_info['Subject'] = l.split(':', 1)[1].strip()
-            elif l.lower().startswith('issuer:'):
-                cert_info['Issuer'] = l.split(':', 1)[1].strip()
-            elif l.lower().startswith('not before:'):
-                cert_info['Not Before'] = l.split(':', 1)[1].strip()
-            elif l.lower().startswith('not after:'):
-                cert_info['Not After'] = l.split(':', 1)[1].strip()
-            elif l.lower().startswith('cipher'):
-                cipher_info.append(l)
-            elif 'vulnerable' in l.lower() or 'weak' in l.lower():
-                vulnerabilities.append(l)
-
-        console.print('\n[bold cyan]sslscan Summary:[/bold cyan]')
-        for k, v in cert_info.items():
-            console.print(f"[green]{k}:[/green] {v}")
-
-        if cipher_info:
-            console.print('\n[cyan]Supported cipher details:[/cyan]')
-            for c in cipher_info[:10]:
-                console.print(f"  • {c}")
-            if len(cipher_info) > 10:
-                console.print(f"  ... and {len(cipher_info) - 10} more")
-
-        if vulnerabilities:
-            console.print('\n[bold red]Potential issues found:[/bold red]')
-            for v in vulnerabilities:
-                console.print(f"[red]• {v}[/red]")
-        else:
-            console.print('\n[bold green]No immediate SSL vulnerabilities detected in sslscan output[/bold green]')
-
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        console.print('[red]sslscan timed out\n[/red]')
     except FileNotFoundError:
-        console.print('[yellow]sslscan not found. Falling back to Python SSL probe...[/yellow]')
-        fallback_success = _ssl_fallback_scan(target, port, output_file)
-        if not fallback_success:
-            console.print('[red]Fallback SSL scan also failed. Please install sslscan or check network connectivity.[/red]')
+        console.print('[red]sslscan command not found. Please install sslscan from https://github.com/rbsec/sslscan and ensure it is in your PATH.[/red]')
+    except subprocess.TimeoutExpired:
+        console.print('[red]sslscan command timed out. Try increasing timeout or checking network connectivity.[/red]')
     except Exception as e:
         console.print(f"[red]SSL analysis failed: {e}[/red]")
 
