@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "host-sniper"
-version = "0.1.3"
+version = "0.1.4"
 description = "Combined security scanning and reconnaissance tool"
 readme = "README.md"
 requires-python = ">=3.8"
