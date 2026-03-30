@@ -78,6 +78,10 @@ def display_menu():
 def main():
     """Main application loop"""
     try:
+        # Check and install dependencies on startup
+        from host_sniper.utils.dependencies import check_and_install_dependencies
+        check_and_install_dependencies()
+        
         while True:
             display_banner()
             menu_text, menu_options = display_menu()

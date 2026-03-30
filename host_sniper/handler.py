@@ -126,11 +126,25 @@ def run_host_scan():
 
 def run_subdomain_enum():
     """Run subdomain enumeration using subfinder"""
+    from host_sniper.utils.dependencies import is_command_available, install_go_tool
+    
     domain = input("Enter domain to enumerate: ").strip()
     
     if not validators.Validators.is_valid_domain(domain):
         console.print("[red]Invalid domain format[/red]")
         return
+    
+    # Check and install subfinder if not available
+    if not is_command_available("subfinder"):
+        console.print("[yellow][!] subfinder not found[/yellow]")
+        choice = input("Install subfinder now? [y/N]: ").strip().lower()
+        if choice == 'y':
+            if not install_go_tool("github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest", "subfinder"):
+                console.print("[red]Failed to install subfinder. Aborting.[/red]")
+                return
+        else:
+            console.print("[red]subfinder is required for subdomain enumeration[/red]")
+            return
     
     output_file = f"{domain}_subdomains.txt"
     
@@ -146,43 +160,30 @@ def run_subdomain_enum():
     
     try:
         console.print(f"[cyan]Running: {' '.join(cmd)}[/cyan]\n")
+        console.print("[bold cyan]subfinder output:[/bold cyan]")
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            refresh_per_second=2
-        ) as progress:
-            task = progress.add_task("Enumerating subdomains...", total=None)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            progress.update(task, completed=True)
+        # Run without capturing output - let user see the tool's output
+        result = subprocess.run(cmd, text=True)
         
         if result.returncode == 0:
-            console.print(f"[bold green][✓] Subdomain enumeration completed[/bold green]")
+            console.print(f"\n[bold green][✓] Subdomain enumeration completed[/bold green]")
             console.print(f"[cyan]Results saved to: {output_file}[/cyan]\n")
             
             # Try to read and display results
             try:
                 with open(output_file, 'r') as f:
-                    subdomains = f.read().strip().split('\n')
-                    console.print(f"[bold cyan]Found {len(subdomains)} subdomains:[/bold cyan]")
-                    for subdomain in subdomains[:20]:  # Show first 20
-                        console.print(f"  • {subdomain}")
-                    if len(subdomains) > 20:
-                        console.print(f"  ... and {len(subdomains) - 20} more")
+                    subdomains = [line.strip() for line in f if line.strip()]
+                    if subdomains:
+                        console.print(f"[bold cyan]Found {len(subdomains)} subdomains:[/bold cyan]")
+                        for subdomain in subdomains[:20]:  # Show first 20
+                            console.print(f"  • {subdomain}")
+                        if len(subdomains) > 20:
+                            console.print(f"  ... and {len(subdomains) - 20} more")
             except Exception as e:
                 console.print(f"[yellow]Could not read results file: {e}[/yellow]")
         else:
-            console.print(f"[bold red][!] Subfinder failed[/bold red]")
-            if result.stderr:
-                console.print(f"[red]Error: {result.stderr}[/red]")
-            console.print(f"[yellow]Make sure subfinder is installed: go get -u github.com/projectdiscovery/subfinder/v2/cmd/subfinder[/yellow]")
+            console.print(f"\n[bold red][!] Subfinder failed with exit code {result.returncode}[/bold red]")
     
-    except FileNotFoundError:
-        console.print("[red]subfinder not found. Install it:[/red]")
-        console.print("[cyan]go get -u github.com/projectdiscovery/subfinder/v2/cmd/subfinder[/cyan]")
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
 
@@ -351,17 +352,17 @@ def run_reverse_ip_lookup():
 
 def run_whois_lookup():
     """Run WHOIS lookup for domain or IP"""
+    from host_sniper.utils.dependencies import install_pip_package
+    
+    # Try to import whois, install if needed
     try:
         import whois
     except ImportError:
-        console.print("[red]python-whois not installed. Installing...[/red]")
-        try:
-            import subprocess
-            subprocess.check_call(["pip", "install", "python-whois"])
-            import whois
-        except:
-            console.print("[red]Failed to install python-whois. Please install manually: pip install python-whois[/red]")
+        console.print("[yellow][*] python-whois not found. Installing...[/yellow]")
+        if not install_pip_package("whois", "python-whois"):
+            console.print("[red]Failed to install python-whois[/red]")
             return
+        import whois
     
     target = input("Enter domain or IP address: ").strip()
     
@@ -429,52 +430,14 @@ def run_whois_lookup():
                 
     except Exception as e:
         console.print(f"[red]WHOIS lookup failed: {e}[/red]")
-        console.print("[yellow]Make sure python-whois is installed: pip install python-whois[/yellow]")
 
 
-def _ssl_fallback_scan(target, port, output_file):
-    """Fallback SSL scan using Python ssl library when sslscan binary is unavailable"""
-    console.print(f"[yellow]Using Python SSL fallback for {target}:{port}[/yellow]")
-    lines = []
-    try:
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-
-        with socket.create_connection((target, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=target) as ssock:
-                cert = ssock.getpeercert()
-                cipher = ssock.cipher()
-                protocol = ssock.version()
-
-                lines.append(f"SSL/TLS fallback scan for {target}:{port}")
-                lines.append(f"Scan time: {datetime.utcnow().isoformat()}Z")
-                lines.append(f"Protocol: {protocol}")
-                if cipher:
-                    lines.append(f"Cipher: {cipher[0]} ({cipher[1]}, {cipher[2]})")
-
-                if cert:
-                    lines.append("\nCertificate details:")
-                    for key, value in cert.items():
-                        lines.append(f"{key}: {value}")
-
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(lines))
-
-        for line in lines:
-            console.print(line)
-
-        console.print(f"[green][✓] Fallback SSL results saved to {output_file}[/green]")
-
-        return True
-
-    except Exception as e:
-        console.print(f"[red]Fallback SSL scan failed: {e}[/red]")
-        return False
 
 
 def run_ssl_analysis():
     """Run SSL certificate analysis using sslscan"""
+    from host_sniper.utils.dependencies import is_command_available, install_apt_package
+    
     target = input("Enter domain or IP address: ").strip()
 
     if not validators.Validators.is_valid_domain(target) and not validators.Validators.is_valid_ip(target):
@@ -484,9 +447,21 @@ def run_ssl_analysis():
     port = input("Enter port [443]: ").strip() or "443"
     try:
         port = int(port)
-    except:
+    except ValueError:
         console.print("[red]Invalid port number[/red]")
         return
+
+    # Check and install sslscan if not available
+    if not is_command_available("sslscan"):
+        console.print("[yellow][!] sslscan not found[/yellow]")
+        choice = input("Install sslscan now? [y/N]: ").strip().lower()
+        if choice == 'y':
+            if not install_apt_package("sslscan", "sslscan"):
+                console.print("[red]Failed to install sslscan. Please install manually from https://github.com/rbsec/sslscan[/red]")
+                return
+        else:
+            console.print("[red]sslscan is required for SSL analysis[/red]")
+            return
 
     output_file = f"{target}_{port}_sslscan.txt"
     cmd = ["sslscan", f"{target}:{port}"]
@@ -495,30 +470,26 @@ def run_ssl_analysis():
     console.print(f"[cyan]Output file: {output_file}[/cyan]\n")
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        console.print("[bold cyan]sslscan output:[/bold cyan]")
+        
+        # Run without capturing - let user see the tool output
+        with open(output_file, 'w') as out_file:
+            result = subprocess.run(cmd, text=True, stdout=out_file, stderr=subprocess.STDOUT)
 
-        if result.returncode != 0:
-            console.print(f"[red]sslscan failed with exit code {result.returncode}[/red]")
-            if result.stderr:
-                console.print(f"[red]{result.stderr.strip()}[/red]")
-            return
-
-        output_text = result.stdout.strip()
-
-        if not output_text:
-            console.print('[yellow]sslscan returned no output. Check whether sslscan is installed and accessible.[/yellow]')
-            return
-
-        # Show output directly
-        console.print('\n[bold cyan]sslscan output:[/bold cyan]')
-        for line in output_text.splitlines():
-            console.print(f"[grey58]{line}[/grey58]")
-
-        # Save output to file
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(output_text)
-
-        console.print(f"[green][✓] sslscan output saved to {output_file}[/green]")
+        if result.returncode == 0:
+            # Display the output that was saved
+            console.print("\n")
+            try:
+                with open(output_file, 'r') as f:
+                    content = f.read()
+                    for line in content.splitlines():
+                        console.print(f"[grey58]{line}[/grey58]")
+            except:
+                pass
+            
+            console.print(f"\n[green][✓] sslscan output saved to {output_file}[/green]")
+        else:
+            console.print(f"\n[bold red][!] sslscan failed with exit code {result.returncode}[/bold red]")
 
     except FileNotFoundError:
         console.print('[red]sslscan command not found. Please install sslscan from https://github.com/rbsec/sslscan and ensure it is in your PATH.[/red]')
@@ -560,34 +531,121 @@ def run_host_info():
         console.print(f"[red]Error: {e}[/red]")
 
 
+def run_dns_records():
+    """Lookup DNS records for a domain"""
+    domain = input("Enter domain to lookup: ").strip()
+    
+    if not validators.Validators.is_valid_domain(domain):
+        console.print("[red]Invalid domain format[/red]")
+        return
+    
+    console.print(f"\n[bold cyan]DNS Records for {domain}:[/bold cyan]")
+    console.print("=" * 60)
+    
+    record_types = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA', 'SRV']
+    results = {}
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+        refresh_per_second=2
+    ) as progress:
+        task = progress.add_task("Querying DNS records...", total=len(record_types))
+        
+        for record_type in record_types:
+            progress.update(task, description=f"Querying {record_type} records...")
+            try:
+                answers = dns.resolver.resolve(domain, record_type, raise_on_no_answer=False)
+                if answers:
+                    results[record_type] = [str(rdata) for rdata in answers]
+            except dns.resolver.NXDOMAIN:
+                console.print(f"\n[red]Domain {domain} does not exist[/red]")
+                return
+            except dns.resolver.NoAnswer:
+                results[record_type] = []
+            except Exception as e:
+                results[record_type] = [f"Error: {e}"]
+            progress.update(task, advance=1)
+    
+    # Display results
+    console.print()
+    for record_type in record_types:
+        if record_type in results and results[record_type]:
+            console.print(f"[bold cyan]{record_type} Records:[/bold cyan]")
+            for record in results[record_type]:
+                console.print(f"  • {record}")
+        else:
+            console.print(f"[yellow]{record_type} Records:[/yellow] [dim]None found[/dim]")
+    
+    # Save to file option
+    save_choice = input("\nSave results to file? [y/N]: ").strip().lower()
+    if save_choice == 'y':
+        filename = input("Enter filename: ").strip() or f"{domain}_dns_records.txt"
+        try:
+            with open(filename, 'w') as f:
+                f.write(f"DNS Records for {domain}\n")
+                f.write("=" * 60 + "\n\n")
+                for record_type in record_types:
+                    if record_type in results and results[record_type]:
+                        f.write(f"{record_type} Records:\n")
+                        for record in results[record_type]:
+                            f.write(f"  {record}\n")
+                    else:
+                        f.write(f"{record_type} Records: None found\n")
+                    f.write("\n")
+            console.print(f"[green][✓] Results saved to {filename}[/green]")
+        except Exception as e:
+            console.print(f"[red]Failed to save results: {e}[/red]")
+
+
 def run_help():
     """Display help information"""
     help_text = """
 [bold cyan]Host Sniper - Combined Security Scanner[/bold cyan]
 
-[bold]Available Tools:[/bold]
-  1. PORT SCANNER - Scan ports on target hosts
+[bold yellow]Available Menu Options:[/bold yellow]
+  1. PORT SCANNER - Scan open ports on target hosts
   2. SUBDOMAIN FINDER - Enumerate subdomains using subfinder
-  3. IP LOOKUP - Lookup IP/domain information
-  4. REVERSE IP LOOKUP - Reverse DNS lookup for IPs
-  5. HOST SCANNER - Scan host networks using BugScanner
-  6. DNS RECORDS - Lookup DNS records
-  7. DOMAIN INFO - Get information for specific domains
-  8. HELP - Display this help
+  3. IP LOOKUP - Lookup IP/domain DNS information  
+  4. REVERSE IP LOOKUP - Reverse lookup domains from IP addresses
+  5. WHOIS LOOKUP - Get WHOIS information for domains/IPs
+  6. SSL ANALYSIS - Analyze SSL/TLS certificates using sslscan
+  7. HOST SCANNER - Scan networks using BugScanner with multiple modes
+  8. DNS RECORDS - Query detailed DNS records (A, AAAA, MX, NS, etc.)
+  9. HOST INFO - Get hostname and DNS information for a domain
+  10. HELP - Show this help message
+  0. EXIT - Quit the application
   
-[bold]Features:[/bold]
-  • Multi-threaded scanning
-  • CIDR range support
-  • Batch processing from files
-  • Multiple scan modes
-  • Report generation
-  • Subprocess integration for external tools
+[bold yellow]Key Features:[/bold yellow]
+  • Multi-threaded scanning for better performance
+  • Batch processing from input files
+  • Multiple scanning modes (Direct, Proxy, SSL, UDP)
+  • Automatic dependency installation
+  • Real-time 3rd-party tool output display
+  • Results saved to output files
+  • Rate limiting for API calls
+  • DNS resolver with configurable servers
 
-[bold]Usage:[/bold]
-  Run the tool and select an option from the menu.
-  
-[bold]Required Tools:[/bold]
-  • subfinder - for subdomain enumeration (go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest)
+[bold yellow]Required External Tools:[/bold yellow]
+  • subfinder - Go tool for subdomain enumeration
+    Install: go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+  • sslscan - Command-line SSL/TLS analyzer
+    Install: apt-get install sslscan (Linux) OR https://github.com/rbsec/sslscan
+
+[bold yellow]Python Dependencies:[/bold yellow]
+  All Python dependencies (requests, rich, dnspython, python-whois) will be
+  installed automatically on first run if not already present.
+
+[bold yellow]Usage Tips:[/bold yellow]
+  • Most tools support batch operations from text files
+  • Results are automatically saved with timestamps
+  • Use rate limiting for bulk API operations
+  • Enable proxy mode for anonymized scanning
+  • Check tool logs for detailed error messages
 """
     console.print(help_text)
 
